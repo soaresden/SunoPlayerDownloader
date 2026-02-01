@@ -1,0 +1,119 @@
+{
+  "app_name": "Suno Downloader",
+  "toolbar": {
+    "cookies": "COOKIES",
+    "reload": "Reload",
+    "language": "Language"
+  },
+  "projects": {
+    "title": "PROJECTS",
+    "columns": {
+      "workspace": "WORKSPACE",
+      "count": "#",
+      "created": "CREATED",
+      "updated": "UPDATED"
+    }
+  },
+  "clips": {
+    "title": "CLIPS",
+    "columns": {
+      "pin": "P",
+      "created": "CREATED",
+      "title": "TITLE",
+      "style": "STYLE",
+      "duration": "⏱",
+      "download": "⬇️"
+    },
+    "buttons": {
+      "download_all": "ALL",
+      "download_checked": "CHECKED"
+    },
+    "context_menu": {
+      "add_to_playlist": "Add to playlist",
+      "add_to_download": "Add to downloads",
+      "view_details": "View details"
+    }
+  },
+  "player": {
+    "title": "PLAYER",
+    "playlist": "PLAYLIST",
+    "no_track": "No track",
+    "buttons": {
+      "clear": "CLEAR",
+      "cache": "CACHE"
+    }
+  },
+  "logs": {
+    "title": "Logs",
+    "app_started": "Suno Downloader v2.0 application started",
+    "file_detected": "File {file} detected",
+    "reading_file": "Reading {file}...",
+    "auth_success": "Authentication successful",
+    "jwt_token": "JWT Token: {token}...",
+    "device_id": "Device ID: {id}",
+    "client_init": "Suno API client initialized",
+    "loading_projects": "Loading projects from Suno API...",
+    "projects_loaded": "{count} projects retrieved from API",
+    "displaying_treeview": "Displaying in TreeView...",
+    "projects_displayed": "Projects displayed successfully",
+    "project_selected": "Project: {name} ({count} clip(s))",
+    "loading_clips": "Retrieving clips from project {id}...",
+    "clips_data_received": "Project data received from API",
+    "pinned_clips": "{count} pinned clip(s) detected",
+    "normal_clips": "{count} normal clip(s) detected",
+    "total_clips": "Total: {total} clips ({pinned} pinned)",
+    "clips_displayed": "{count} clips displayed in TreeView",
+    "workspace_active": "Active workspace: {name}",
+    "added_to_playlist": "Added to playlist: {title}",
+    "clip_loaded": "Loaded: {title}",
+    "found_in_musik": "Found in Musik: {path}",
+    "audio_loaded": "Audio loaded: {path}",
+    "play": "Playback started",
+    "pause": "Pause",
+    "stop": "Stop",
+    "previous": "Track {current}/{total}",
+    "next": "Track {current}/{total}",
+    "download_request": "Download request for {count} clip(s)",
+    "downloading": "Downloading {count} clip(s) to {path}",
+    "download_success": "Success: {count}",
+    "download_errors": "Errors: {count}",
+    "tagging": "Adding ID3 tags: {title}",
+    "cover_added": "Cover added",
+    "tags_saved": "Tags saved",
+    "file_downloaded": "File downloaded ({size} MB)",
+    "download_complete": "Download complete:",
+    "cache_cleared": "Temporary cache cleared ({count} file(s))",
+	    "file_not_found": "⚠️  {file} not found - Click 📁 COOKIES",
+    "opening_file_dialog": "📂 Opening file selector...",
+    "file_selected": "📁 File selected: {file}",
+    "selection_cancelled": "❌ Selection cancelled",
+    "error": "❌ ERROR: {msg}",
+    "traceback": "{trace}",
+    "reload_attempt": "🔄 Attempting to reload cookies...",
+    "no_cookies_loaded": "❌ No cookies file loaded",
+    "reloading": "🔄 Reloading {file}...",
+    "client_not_init": "⚠️  Client not initialized - Cannot load projects",
+    "selecting_project": "🖱️ Selecting project ID: {id}...",
+    "project_not_found": "⚠️  Project {id}... not found in list",
+    "error_loading_clips": "❌ ERROR LOADING CLIPS: {msg}",
+    "no_project_selected": "⚠️ No project selected for download",
+    "no_project_active": "⚠️ No active project",
+    "confirm_download": "❓ Confirm download request: {name} ({count} clips)",
+    "download_start": "📥 START downloading project: {name}",
+    "download_cancelled": "❌ Download cancelled by user",
+    "download_progress": "[{current}/{total}] 📥 {title}",
+    "added_to_download": "📥 Added to download queue: {title}",
+    "loading_language": "🌍 Loading language: {lang}",
+    "language_changed": "✅ Language changed: {lang}"
+  },
+  "messages": {
+    "no_project": "Select a project",
+    "no_tracks_playlist": "No tracks in playlist",
+    "no_tracks_download": "No tracks checked for download",
+    "confirm_download_all": "Download all {count} clips from '{name}'?",
+    "download_complete_msg": "{success} file(s) downloaded\n{errors} error(s)\n\nFolder: {folder}",
+    "add_tracks_to_playlist": "Add tracks to playlist",
+    "development": "Feature in development",
+	"no_cookies": "No cookies file loaded"
+  }
+}
