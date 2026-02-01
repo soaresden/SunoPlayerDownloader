@@ -1,5 +1,8 @@
 # 🎵 Suno Player & Downloader
 
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/a2b1435a-44de-46e4-b28c-a97f2fec01f3" />
+
+
 <div align="center">
 
 ![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)
