@@ -37,19 +37,16 @@ Dependencies install automatically!
 
 ### 2. Export Cookies
 
-**Drag this button to your bookmarks bar:**
+**Create a bookmark and edit with this code**
 
-<a href="javascript:(function(){const e=['cookie','_cfuvid','__client','__client_uat','_clck','_clsk','cf_clearance','__stripe_mid','__stripe_sid','_ga','_ga_*','__cf_bm'],t=document.cookie.split('; ').reduce((t,o)=>{const[c,n]=o.split('=');return e.some(e=>e.endsWith('*')?c.startsWith(e.slice(0,-1)):c===e)&&(t[c]=n),t},{}),o=JSON.stringify(t,null,2),c=document.createElement('a');c.href='data:application/json;charset=utf-8,'+encodeURIComponent(o),c.download='suno_cookies.json',c.click()})();">📥 Export Suno Cookies</a>
+```
+javascript:(function(){const e=['__session','__session_*','cookie','_cfuvid','__client','__client_uat','_clck','_clsk','cf_clearance','__stripe_mid','__stripe_sid','_ga','_ga_*','__cf_bm','suno_device_id','ajs_anonymous_id'],t=document.cookie.split('; ').reduce((t,o)=>{const[c,n]=o.split('=');return e.some(e=>e.endsWith('*')?c.startsWith(e.slice(0,-1)):c===e)&&(t[c]=n),t},{}),o=JSON.stringify(t,null,2),c=document.createElement(%27a%27);c.href=%27data:application/json;charset=utf-8,%27+encodeURIComponent(o),c.download=%27suno_cookies.json%27,c.click()})();
+```
 
 **Then:**
 1. Go to [suno.com](https://suno.com) and login
 2. Click the bookmark
 3. Save `suno_cookies.json` in project folder
-
-**Alternative (manual):** Open browser console (F12) and paste:
-```javascript
-(function(){const e=['cookie','_cfuvid','__client','__client_uat','_clck','_clsk','cf_clearance','__stripe_mid','__stripe_sid','_ga','_ga_*','__cf_bm'],t=document.cookie.split('; ').reduce((t,o)=>{const[c,n]=o.split('=');return e.some(e=>e.endsWith('*')?c.startsWith(e.slice(0,-1)):c===e)&&(t[c]=n),t},{}),o=JSON.stringify(t,null,2),c=document.createElement('a');c.href='data:application/json;charset=utf-8,'+encodeURIComponent(o),c.download='suno_cookies.json',c.click()})();
-```
 
 ### 3. Done!
 
