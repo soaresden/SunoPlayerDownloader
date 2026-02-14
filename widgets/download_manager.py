@@ -34,7 +34,7 @@ class DownloadManager(tk.Frame):
         
         self.count_label = tk.Label(
             header,
-            text="⬇️ DOWNLOADS (0)",
+            text=f"⬇️ {self.lang.get('player.downloads')} (0)",
             font=("Arial", 9, "bold"),
             bg=COLOR_CARD_BG,
             fg=COLOR_SUNO_ORANGE
@@ -73,7 +73,7 @@ class DownloadManager(tk.Frame):
         
         tk.Button(
             btns,
-            text="📥 DL",
+            text=self.lang.get("player.buttons.download"),
             font=("Arial", 8, "bold"),
             bg=COLOR_SUNO_ORANGE,
             fg="white",
@@ -138,13 +138,16 @@ class DownloadManager(tk.Frame):
         
         for i, clip_data in enumerate(self.download_list):
             clip = clip_data.get('clip', {})
-            title = clip.get('title', 'Sans titre')
+            title = clip.get('title', self.lang.get('common.untitled'))  # ⭐ TRADUIT
             clip_id = clip.get('id', '')[:8]
             
             display_title = f"{title[:35]} [{clip_id}]"
             self.listbox.insert(tk.END, f"{i+1}. {display_title}")
         
-        self.count_label.config(text=f"⬇️ DOWNLOADS ({len(self.download_list)})")
+        # ⭐ TRADUIT
+        self.count_label.config(
+            text=f"⬇️ {self.lang.get('player.downloads')} ({len(self.download_list)})"
+        )
     
     def _on_right_click(self, event):
         """Clic droit → Menu"""
@@ -156,10 +159,10 @@ class DownloadManager(tk.Frame):
         clip_data = self.download_list[index]
         
         menu = Menu(self, tearoff=0)
-        menu.add_command(label="📥 Télécharger", command=lambda: self.callbacks.get('on_download_one')(clip_data, index))
-        menu.add_command(label="🖼️ Voir détails", command=lambda: self.callbacks.get('on_details')(clip_data))
+        menu.add_command(label=f"📥 {self.lang.get('player.context_menu.download')}", command=lambda: self.callbacks.get('on_download_one')(clip_data, index))
+        menu.add_command(label=f"🖼️ {self.lang.get('player.context_menu.view_details')}", command=lambda: self.callbacks.get('on_details')(clip_data))
         menu.add_separator()
-        menu.add_command(label="🗑️ Retirer", command=lambda: self.remove(index))
+        menu.add_command(label=f"🗑️ {self.lang.get('player.context_menu.remove')}", command=lambda: self.remove(index))
         
         try:
             menu.tk_popup(event.x_root, event.y_root)

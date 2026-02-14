@@ -33,6 +33,7 @@ def check_and_install_requirements():
     # ✨ MAPPING spécial pour certains packages
     package_import_map = {
         'Pillow': 'PIL',  # Pillow s'importe comme PIL
+        'python-vlc': 'vlc'  # ← AJOUTE CETTE LIGNE
     }
     
     missing_packages = []

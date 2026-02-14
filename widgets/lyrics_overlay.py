@@ -12,7 +12,7 @@ from utils.formatters import format_date
 class ClipDetailsOverlay:
     """Overlay complet avec pochette, infos, paroles et checkboxes"""
     
-    def __init__(self, parent, clip_data: dict, callbacks: dict):
+    def __init__(self, parent, clip_data: dict, callbacks: dict, lang_manager):
         """
         Args:
             parent: Fenêtre parent
@@ -24,16 +24,22 @@ class ClipDetailsOverlay:
                 'is_in_download': function(clip_id) -> bool,
                 'log': function(message)
             }
+            lang_manager: Gestionnaire de langues
         """
         self.parent = parent
         self.clip_data = clip_data
         self.callbacks = callbacks
+        self.lang = lang_manager
         self.window = None
         
         clip = clip_data.get('clip', {})
         self.clip_id = clip.get('id', '')
         
-        self.callbacks.get('log', lambda x: None)(f"🖼️ Ouverture détails clip: {clip.get('title', 'Sans titre')[:50]}")
+        # Log avec traduction
+        title = clip.get('title', self.lang.get('common.untitled'))
+        self.callbacks.get('log', lambda x: None)(
+            self.lang.get('logs.overlay_opening', title=title[:50])
+        )
         
         self._create_overlay()
     
@@ -42,18 +48,18 @@ class ClipDetailsOverlay:
         clip = self.clip_data.get('clip', {})
         
         # Données
-        title = clip.get('title', 'Sans titre')
-        artist = clip.get('display_name', 'Artiste inconnu')
+        title = clip.get('title', self.lang.get('common.untitled'))
+        artist = clip.get('display_name', self.lang.get('common.unknown_artist'))
         created = format_date(clip.get('created_at', ''))
         
         meta = clip.get('metadata', {})
-        lyrics = meta.get('prompt', 'Aucunes paroles disponibles') if meta else 'Aucunes paroles disponibles'
+        lyrics = meta.get('prompt', self.lang.get('overlay.no_lyrics')) if meta else self.lang.get('overlay.no_lyrics')
         
         image_url = clip.get('image_large_url') or clip.get('image_url', '')
         
         # Fenêtre
         self.window = tk.Toplevel(self.parent)
-        self.window.title(f"🎵 {title}")
+        self.window.title(f"{self.lang.get('overlay.title_prefix')} {title}")
         self.window.geometry("700x600")
         self.window.transient(self.parent)
         self.window.grab_set()
@@ -101,12 +107,16 @@ class ClipDetailsOverlay:
                 img_label.image = photo  # Garde référence
                 img_label.pack(fill=tk.BOTH, expand=True)
                 
-                self.callbacks.get('log', lambda x: None)(f"✅ Pochette chargée")
+                self.callbacks.get('log', lambda x: None)(
+                    self.lang.get('logs.cover_loaded')
+                )
             except Exception as e:
-                self.callbacks.get('log', lambda x: None)(f"⚠️ Erreur chargement pochette: {e}")
+                self.callbacks.get('log', lambda x: None)(
+                    self.lang.get('logs.cover_error', error=str(e))
+                )
                 tk.Label(
                     cover_frame,
-                    text="🎵\n\nPas de\npochette",
+                    text=f"🎵\n\n{self.lang.get('player.no_cover')}",
                     font=("Arial", 12),
                     bg="#ecf0f1",
                     fg="#7f8c8d"
@@ -114,7 +124,7 @@ class ClipDetailsOverlay:
         else:
             tk.Label(
                 cover_frame,
-                text="🎵\n\nPas de\npochette",
+                text=f"🎵\n\n{self.lang.get('player.no_cover')}",
                 font=("Arial", 12),
                 bg="#ecf0f1",
                 fg="#7f8c8d"
@@ -123,7 +133,7 @@ class ClipDetailsOverlay:
         # Infos textuelles
         tk.Label(
             info_frame,
-            text=f"👤 {artist}",
+            text=f"{self.lang.get('overlay.artist_prefix')} {artist}",
             font=("Arial", 10),
             anchor=tk.W,
             justify=tk.LEFT
@@ -131,7 +141,7 @@ class ClipDetailsOverlay:
         
         tk.Label(
             info_frame,
-            text=f"📅 {created}",
+            text=f"{self.lang.get('overlay.date_prefix')} {created}",
             font=("Arial", 9),
             fg="#7f8c8d",
             anchor=tk.W
@@ -150,7 +160,7 @@ class ClipDetailsOverlay:
         
         tk.Checkbutton(
             checkbox_frame,
-            text="🎵 Ajouter à la playlist",
+            text=f"🎵 {self.lang.get('overlay.buttons.add_playlist')}",
             variable=self.playlist_var,
             font=("Arial", 9),
             command=self._on_playlist_toggle
@@ -158,7 +168,7 @@ class ClipDetailsOverlay:
         
         tk.Checkbutton(
             checkbox_frame,
-            text="⬇️ Marquer pour DL",
+            text=f"⬇️ {self.lang.get('overlay.buttons.mark_download')}",
             variable=self.download_var,
             font=("Arial", 9),
             command=self._on_download_toggle
@@ -170,7 +180,7 @@ class ClipDetailsOverlay:
         
         tk.Label(
             lyrics_frame,
-            text="📝 PAROLES",
+            text=f"📝 {self.lang.get('overlay.lyrics_title')}",
             font=("Arial", 10, "bold"),
             anchor=tk.W
         ).pack(fill=tk.X, pady=(0, 5))
@@ -192,7 +202,7 @@ class ClipDetailsOverlay:
         
         tk.Button(
             btn_frame,
-            text="FERMER",
+            text=self.lang.get('overlay.buttons.close'),
             font=("Arial", 10, "bold"),
             bg=COLOR_PRIMARY,
             fg="white",
@@ -210,7 +220,12 @@ class ClipDetailsOverlay:
     def _on_playlist_toggle(self):
         """Toggle playlist"""
         checked = self.playlist_var.get()
-        self.callbacks.get('log', lambda x: None)(f"{'✅' if checked else '❌'} Playlist toggle: {self.clip_id[:8]}")
+        status = '✅' if checked else '❌'
+        self.callbacks.get('log', lambda x: None)(
+            self.lang.get('logs.overlay_playlist_toggle', 
+                         status=status, 
+                         clip_id=self.clip_id[:8])
+        )
         
         callback = self.callbacks.get('on_playlist_toggle')
         if callback:
@@ -219,7 +234,12 @@ class ClipDetailsOverlay:
     def _on_download_toggle(self):
         """Toggle download"""
         checked = self.download_var.get()
-        self.callbacks.get('log', lambda x: None)(f"{'✅' if checked else '❌'} Download toggle: {self.clip_id[:8]}")
+        status = '✅' if checked else '❌'
+        self.callbacks.get('log', lambda x: None)(
+            self.lang.get('logs.overlay_download_toggle',
+                         status=status,
+                         clip_id=self.clip_id[:8])
+        )
         
         callback = self.callbacks.get('on_download_toggle')
         if callback:
@@ -227,13 +247,15 @@ class ClipDetailsOverlay:
     
     def close(self):
         """Ferme l'overlay"""
-        self.callbacks.get('log', lambda x: None)(f"❌ Fermeture détails clip")
+        self.callbacks.get('log', lambda x: None)(
+            self.lang.get('logs.overlay_closing')
+        )
         if self.window:
             self.window.destroy()
             self.window = None
 
 
-def show_clip_details(parent, clip_data: dict, callbacks: dict):
+def show_clip_details(parent, clip_data: dict, callbacks: dict, lang_manager):
     """
     Affiche l'overlay de détails d'un clip
     
@@ -241,5 +263,6 @@ def show_clip_details(parent, clip_data: dict, callbacks: dict):
         parent: Fenêtre parent
         clip_data: Données du clip
         callbacks: Callbacks pour interactions
+        lang_manager: Gestionnaire de langues
     """
-    ClipDetailsOverlay(parent, clip_data, callbacks)
+    ClipDetailsOverlay(parent, clip_data, callbacks, lang_manager)

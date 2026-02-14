@@ -31,14 +31,11 @@ class AudioCache:
         """
         Récupère le chemin du fichier audio (cherche ou télécharge)
         
-        Args:
-            clip_data: Données du clip
-            workspace_name: Nom du workspace
-            permanent: Si True, télécharge dans downloads (pas !temp)
-            track_number: Numéro de piste (001, 002, etc.)
-            
-        Returns:
-            Chemin vers le fichier audio, ou None si erreur
+        ORDRE DE PRIORITÉ :
+        1. Musik (dossiers "Suno*")
+        2. Downloads permanents
+        3. Cache !temp (lecture seule)
+        4. Téléchargement
         """
         clip = clip_data.get('clip', {})
         title = clip.get('title', 'Sans titre')
@@ -52,70 +49,115 @@ class AudioCache:
         
         # Génère le nom de fichier
         safe_title = self._sanitize_filename(title)
-        
-        # ⭐ NOUVEAU FORMAT: ##-000 Titre (ID).mp3 ou ##-000 Titre (ID)_UPLOADED.mp3
-        disc_number = 1  # Disc par défaut
-        track_str = f"{track_number:03d}"  # 001, 002, 003...
+        disc_number = 1
+        track_str = f"{track_number:03d}"
         id_short = clip_id[:8]
-        
-        # Suffixe _UPLOADED si pinned
         upload_suffix = "_UPLOADED" if is_pinned else ""
-        
         filename = f"{disc_number:02d}-{track_str} {safe_title} ({id_short}){upload_suffix}.mp3"
         
-        # SI TÉLÉCHARGEMENT PERMANENT
+        # ✅ ÉTAPE 1 : Cherche dans Musik
+        musik_path = self._search_in_musik(safe_title, clip_id)
+        if musik_path:
+            # ⭐ NOUVEAU : Vérifie si le fichier a l'ID Suno dans ISRC
+            has_id = self._check_suno_id_in_file(musik_path, clip_id)
+            
+            if has_id:
+                self.log(f"⏭️  IGNORÉ (déjà avec ID) : {Path(musik_path).name}")
+                return musik_path
+            else:
+                if permanent:
+                    self.log(f"⚠️  SANS ID - RE-TÉLÉCHARGEMENT : {Path(musik_path).name}")
+                else:
+                    # Pour la lecture, on utilise quand même le fichier
+                    self.log(f"✅ Trouvé dans Musik (sans ID) : {Path(musik_path).name}")
+                    return musik_path
+        
+        # ✅ ÉTAPE 2 : Cherche dans Downloads
+        workspace_folder = Path(DOWNLOADS_PATH) / f"Suno-{self._sanitize_filename(workspace_name)}"
+        downloads_path = workspace_folder / filename
+        
+        if downloads_path.exists():
+            self.log(f"⏭️  IGNORÉ (déjà dans Downloads) : {filename}")
+            return str(downloads_path)
+        
+        # ✅ ÉTAPE 3 : Si lecture, cherche dans !temp
+        if not permanent:
+            temp_path = Path(TEMP_CACHE_PATH) / filename
+            
+            if temp_path.exists():
+                self.log(f"✅ Trouvé dans cache : {filename}")
+                return str(temp_path)
+        
+        # ✅ ÉTAPE 4 : Télécharge
         if permanent:
-            workspace_folder = Path(DOWNLOADS_PATH) / f"Suno-{self._sanitize_filename(workspace_name)}"
-            downloads_path = workspace_folder / filename
-            
-            if downloads_path.exists():
-                self.log(f"✅ Déjà téléchargé: {downloads_path}")
-                return str(downloads_path)
-            
-            self.log(f"📥 Téléchargement permanent: {filename}")
+            # Téléchargement permanent dans Downloads
+            self.log(f"📥 TÉLÉCHARGEMENT : {title[:50]}")
             workspace_folder.mkdir(parents=True, exist_ok=True)
             downloaded_path = self._download_audio(audio_url, str(downloads_path))
             
             if downloaded_path:
                 self.tagger.tag_file(downloaded_path, clip_data, workspace_name, track_number, disc_number=1)
-                self.log(f"  ✅ Téléchargé et taggé")
+                self.log(f"     ✅ Sauvegardé : {filename}")
                 
-                # ⭐ NE PAS supprimer tout de suite (fichier peut être utilisé)
-                # La suppression sera faite après arrêt du player
-                
+                # Supprime du cache
+                self.delete_temp_file(clip_id, title)
             else:
-                self.log(f"  ❌ Échec du téléchargement")
+                self.log(f"     ❌ ÉCHEC téléchargement")
             
             return downloaded_path
+        else:
+            # Téléchargement cache temporaire
+            temp_path = Path(TEMP_CACHE_PATH) / filename
+            self.log(f"📥 Téléchargement cache : {filename}")
+            downloaded_path = self._download_audio(audio_url, str(temp_path))
+            
+            if downloaded_path:
+                self.tagger.tag_file(downloaded_path, clip_data, workspace_name, track_number, disc_number=1)
+            
+            return downloaded_path
+    
+    def _check_suno_id_in_file(self, filepath: str, clip_id: str) -> bool:
+        """
+        ⭐ NOUVELLE MÉTHODE : Vérifie si un fichier MP3 contient l'ID Suno dans le tag ISRC
         
-        # SI LECTURE : Chercher dans Musik d'abord
-        musik_path = self._search_in_musik(safe_title)
-        if musik_path:
-            self.log(f"✅ Trouvé dans Musik: {musik_path}")
-            return musik_path
+        Args:
+            filepath: Chemin du fichier
+            clip_id: ID Suno à vérifier
         
-        # Cherche dans Downloads
-        workspace_folder = Path(DOWNLOADS_PATH) / f"Suno-{self._sanitize_filename(workspace_name)}"
-        downloads_path = workspace_folder / filename
-        
-        if downloads_path.exists():
-            self.log(f"✅ Trouvé dans Downloads: {downloads_path}")
-            return str(downloads_path)
-        
-        # Cache temporaire
-        temp_path = Path(TEMP_CACHE_PATH) / filename
-        
-        if temp_path.exists():
-            self.log(f"✅ Trouvé dans cache: {temp_path}")
-            return str(temp_path)
-        
-        self.log(f"📥 Téléchargement cache: {filename}")
-        downloaded_path = self._download_audio(audio_url, str(temp_path))
-        
-        if downloaded_path:
-            self.tagger.tag_file(downloaded_path, clip_data, workspace_name, track_number)
-        
-        return downloaded_path
+        Returns:
+            True si l'ID est trouvé dans l'ISRC
+        """
+        try:
+            from mutagen.mp3 import MP3
+            
+            audio = MP3(filepath)
+            
+            # ⭐ PRIORITÉ : Lit depuis ISRC (tag TSRC) - NOUVEAU FORMAT
+            if 'TSRC' in audio.tags:
+                isrc = str(audio.tags['TSRC'])
+                if clip_id in isrc:
+                    return True
+            
+            # ⚠️ FALLBACK : Anciens fichiers avec COMM/TXXX
+            # Pour compatibilité avec les MP3 déjà taggés avant le changement
+            
+            # Cherche dans COMM (ancien format)
+            if 'COMM::eng' in audio.tags:
+                comm_text = str(audio.tags['COMM::eng'])
+                if clip_id in comm_text:
+                    return True
+            
+            # Cherche dans TXXX (ancien format)
+            if 'TXXX:SUNO_ID' in audio.tags:
+                txxx_text = str(audio.tags['TXXX:SUNO_ID'])
+                if clip_id in txxx_text:
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            # En cas d'erreur de lecture, on suppose qu'il n'y a pas d'ID
+            return False
     
     def delete_temp_file(self, clip_id: str, title: str):
         """
@@ -164,13 +206,14 @@ class AudioCache:
                     return
                 
                 
-    def _search_in_musik(self, title: str) -> Optional[str]:
+    def _search_in_musik(self, title: str, clip_id: str = '') -> Optional[str]:
         """
         Cherche un fichier audio dans la bibliothèque Musik
         UNIQUEMENT dans les dossiers commençant par "Suno" ou "SUNO"
         
         Args:
             title: Titre du morceau
+            clip_id: ID du clip (optionnel)
             
         Returns:
             Chemin du fichier trouvé, ou None
@@ -192,7 +235,11 @@ class AudioCache:
             for root, dirs, files in os.walk(folder):
                 for file in files:
                     if file.lower().endswith(('.mp3', '.flac', '.wav', '.m4a', '.ogg')):
+                        # Cherche par titre
                         if title_lower in file.lower():
+                            return os.path.join(root, file)
+                        # Cherche par ID si fourni
+                        if clip_id and clip_id[:8] in file:
                             return os.path.join(root, file)
         
         return None
@@ -209,7 +256,7 @@ class AudioCache:
             Chemin du fichier téléchargé, ou None si erreur
         """
         try:
-            self.log(f"  ⏳ Téléchargement depuis: {url[:60]}...")
+            self.log(f"     ⏳ Téléchargement depuis: {url[:60]}...")
             
             response = requests.get(url, stream=True, timeout=30)
             response.raise_for_status()
@@ -219,12 +266,12 @@ class AudioCache:
                     f.write(chunk)
             
             file_size = os.path.getsize(output_path) / (1024 * 1024)
-            self.log(f"  ✅ Fichier téléchargé ({file_size:.2f} MB)")
+            self.log(f"     ✅ Fichier téléchargé ({file_size:.2f} MB)")
             
             return output_path
             
         except Exception as e:
-            self.log(f"  ❌ Erreur téléchargement: {e}")
+            self.log(f"     ❌ Erreur téléchargement: {e}")
             
             if os.path.exists(output_path):
                 os.remove(output_path)

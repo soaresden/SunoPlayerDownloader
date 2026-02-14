@@ -9,6 +9,10 @@ DEFAULT_WIDTH = 1500
 DEFAULT_HEIGHT = 850
 DEFAULT_LANGUAGE = "Français"
 
+# Configuration GUI
+WINDOW_TITLE = "🎵 Suno Player"
+WINDOW_SIZE = "1400x800"
+
 # Fichiers
 COOKIES_FILE = "suno_cookies.json"
 

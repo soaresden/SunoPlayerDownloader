@@ -1,7 +1,6 @@
 """
 Gestion de l'authentification et des cookies Suno
 """
-
 import json
 from pathlib import Path
 from typing import Dict, Optional
@@ -42,8 +41,23 @@ class AuthManager:
         with open(path, 'r', encoding='utf-8') as f:
             credentials = json.load(f)
         
+        # ⭐ SUPPORTE PLUSIEURS FORMATS
+        # Format 1: jwt_token direct (ancien)
         self.jwt_token = credentials.get('jwt_token', '')
-        self.device_id = credentials.get('device_id', DEFAULT_DEVICE_ID)
+        
+        # Format 2: __session (nouveau bookmarklet)
+        if not self.jwt_token:
+            self.jwt_token = credentials.get('__session', '')
+        
+        # Format 3: __client (très ancien)
+        if not self.jwt_token:
+            self.jwt_token = credentials.get('__client', '')
+        
+        # Device ID
+        self.device_id = credentials.get('device_id') or \
+                        credentials.get('suno_device_id') or \
+                        credentials.get('ajs_anonymous_id') or \
+                        DEFAULT_DEVICE_ID
         
         if not self.jwt_token:
             raise ValueError("Token JWT vide dans le fichier")

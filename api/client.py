@@ -8,6 +8,7 @@ import time
 import base64
 from typing import List, Dict
 from config import SUNO_BASE_URL
+from utils.timestamp_parser import parse_relative_time
 
 
 class SunoClient:
@@ -136,3 +137,69 @@ class SunoClient:
         except Exception as e:
             print(f"Erreur téléchargement: {e}")
             return False
+    
+    def rename_project(self, project_id: str, new_name: str, description: str = "") -> dict:
+        """
+        Renomme un workspace/projet
+        
+        Args:
+            project_id: ID du projet
+            new_name: Nouveau nom
+            description: Description (optionnel)
+        
+        Returns:
+            Données du projet mis à jour
+        """
+        url = f"{SUNO_BASE_URL}/api/project/{project_id}/metadata"
+        
+        payload = {
+            "name": new_name,
+            "description": description or new_name
+        }
+        
+        response = self.session.post(url, json=payload)
+        response.raise_for_status()
+        
+        return response.json()
+    
+    def delete_project(self, project_id: str) -> bool:
+        """
+        Supprime un workspace/projet (met à la corbeille)
+        
+        Args:
+            project_id: ID du projet
+        
+        Returns:
+            True si succès
+        """
+        # Méthode 1 : Mettre à la corbeille (soft delete)
+        url = f"{SUNO_BASE_URL}/api/project/{project_id}/trash"
+        
+        try:
+            response = self.session.post(url, json={})
+            response.raise_for_status()
+            return True
+        except:
+            pass
+        
+        # Méthode 2 : DELETE direct
+        url = f"{SUNO_BASE_URL}/api/project/{project_id}"
+        
+        try:
+            response = self.session.delete(url)
+            response.raise_for_status()
+            return True
+        except:
+            pass
+        
+        # Méthode 3 : POST /metadata avec is_trashed
+        url = f"{SUNO_BASE_URL}/api/project/{project_id}/metadata"
+        
+        try:
+            response = self.session.post(url, json={"is_trashed": True})
+            response.raise_for_status()
+            return True
+        except:
+            pass
+        
+        return False

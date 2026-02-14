@@ -8,6 +8,7 @@ from typing import List, Dict, Callable, Set
 from config import *
 from utils.formatters import format_date, format_duration
 from widgets.lyrics_overlay import show_clip_details
+from utils.treeview_sorter import make_treeview_sortable
 
 
 class ClipsPanel(tk.Frame):
@@ -130,12 +131,24 @@ class ClipsPanel(tk.Frame):
         self.tree.column("dl", width=35, anchor=tk.CENTER)
         
         self.tree.pack(fill=tk.BOTH, expand=True)
+        self._setup_sorting()
+
         
          # ⭐ NOUVEAUX BINDS
         self.tree.bind("<Double-Button-1>", self._on_double_click_add_playlist)  # Double-clic → Playlist
         self.tree.bind("<Button-1>", self._on_click)  # Clic simple → Checkboxes
         self.tree.bind("<Button-3>", self._on_right_click_show_details)  # Clic droit → Détails
 
+    def _setup_sorting(self):
+        """Active le tri"""
+        self.sorter = make_treeview_sortable(self.tree, {
+            'pin': {'type': 'text', 'reverse': True},
+            'created': {'type': 'date', 'reverse': True},
+            'title': {'type': 'text', 'reverse': False},
+            'style': {'type': 'text', 'reverse': False},
+            'dur': {'type': 'text', 'reverse': True}
+        })
+        
     def load_clips(self, project_name: str, clips: List[Dict]):
         """Charge les clips"""
         self.log(f"📥 Chargement de {len(clips)} clips pour projet: {project_name}")
@@ -237,7 +250,7 @@ class ClipsPanel(tk.Frame):
             'is_in_playlist': lambda cid: False,
             'is_in_download': lambda cid: cid in self.download_checked,
             'log': self.log
-        })
+        }, self.lang)
     
     def _on_right_click(self, event):
         """Menu contextuel clic droit"""
@@ -340,7 +353,7 @@ class ClipsPanel(tk.Frame):
             'is_in_playlist': lambda cid: False,
             'is_in_download': lambda cid: cid in self.download_checked,
             'log': self.log
-        })
+        }, self.lang)
         
         
     def _add_to_playlist_from_menu(self, clip_data: dict):

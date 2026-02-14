@@ -34,27 +34,29 @@ class Toolbar(tk.Frame):
             bg=COLOR_DARK_BG,
             fg=COLOR_SUNO_YELLOW
         ).pack(side=tk.LEFT, padx=(0, 8))
-        
+
+        # ⭐ LOGO DYNAMIQUE
+        app_name_parts = self.lang.get('app.name').split()  # "Suno Downloader" → ["Suno", "Downloader"]
+
         tk.Label(
             logo_frame,
-            text="SUNO",
+            text=app_name_parts[0] if app_name_parts else "Suno",
             font=("Arial", 16, "bold"),
             bg=COLOR_DARK_BG,
             fg=COLOR_SUNO_YELLOW
         ).pack(side=tk.LEFT, padx=(0, 3))
-        
+
         tk.Label(
             logo_frame,
-            text="Downloader",
+            text=app_name_parts[1] if len(app_name_parts) > 1 else "Downloader",
             font=("Arial", 14),
             bg=COLOR_DARK_BG,
             fg=COLOR_TEXT_MUTED
         ).pack(side=tk.LEFT)
         
-        # Status (droite)
         self.status_label = tk.Label(
             self,
-            text="⚪",
+            text=self.lang.get('status.idle'),  # ⭐ TRADUIT
             font=("Arial", 16),
             bg=COLOR_DARK_BG
         )
@@ -126,6 +128,16 @@ class Toolbar(tk.Frame):
         """Met à jour les textes après changement de langue"""
         self.btn_cookies.config(text=self.lang.get('toolbar.cookies'))
     
-    def set_status(self, status: str):
-        """Met à jour le status"""
-        self.status_label.config(text=status)
+    def set_status(self, status_key: str):
+        """Change le status (idle, connected, loading, disconnected)"""
+        self.status_label.config(text=self.lang.get(f'status.{status_key}'))
+        
+    def update_texts(self):
+        """Met à jour les textes après changement de langue"""
+        # Logo
+        app_name_parts = self.lang.get('app.name').split()
+        # Note: Les labels du logo ne sont pas stockés, donc on ne peut pas les update facilement
+        # Solution : recréer le logo ou accepter qu'il ne change pas
+        
+        # Bouton cookies
+        self.btn_cookies.config(text=self.lang.get('toolbar.cookies'))

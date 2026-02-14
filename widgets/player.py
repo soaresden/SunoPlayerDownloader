@@ -46,7 +46,7 @@ class PlayerOverlay:
         # Header
         header = tk.Label(
             self.window,
-            text="🎵 SUNO PLAYER",
+            text=self.lang.get('app.title'),  # ⭐ TRADUIT
             font=("Arial", 16, "bold"),
             bg=COLOR_PRIMARY,
             fg="white",
@@ -67,7 +67,7 @@ class PlayerOverlay:
         # Info piste
         self.info_label = tk.Label(
             self.window,
-            text="Aucune piste",
+            text=self.lang.get("player.no_track"),
             font=("Arial", 11)
         )
         self.info_label.pack(pady=10)
@@ -198,16 +198,15 @@ class PlayerOverlay:
         
         # Info playlist
         if self.playlist:
-            self.playlist_label.config(
-                text=f"Playlist: {self.current_index + 1}/{len(self.playlist)}"
-            )
+            text = f"{self.lang.get('player.playlist')}: {self.current_index + 1}/{len(self.playlist)}"
+            self.playlist_label.config(text=text)
         else:
-            self.playlist_label.config(text="Aucune playlist chargée")
+            self.playlist_label.config(text=self.lang.get('messages.no_playlist'))  # ⭐ TRADUIT
         
         # Info piste
         if self.current_clip:
             clip = self.current_clip.get('clip', {})
-            title = clip.get('title', 'Sans titre')
+            title = clip.get('title', self.lang.get('common.untitled'))  # ⭐ TRADUIT
             artist = clip.get('display_name', '')
             
             display_text = title
@@ -216,7 +215,7 @@ class PlayerOverlay:
             
             self.info_label.config(text=display_text[:60])
         else:
-            self.info_label.config(text="Aucune piste")
+            self.info_label.config(text=self.lang.get('player.no_track'))  # ⭐ TRADUIT
     
     def play(self):
         """Démarre la lecture"""

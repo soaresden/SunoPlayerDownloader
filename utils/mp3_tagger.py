@@ -100,6 +100,14 @@ class MP3Tagger:
             if duration_ms > 0:
                 audio.tags.add(TLEN(encoding=3, text=str(duration_ms)))
             
+            # ⭐ NOUVEAU : Stocke l'ID Suno dans les tags
+            # Stocke l'ID Suno
+            clip_id = clip.get('id', '')
+            if clip_id:
+                from mutagen.id3 import TSRC
+                audio.tags.add(TSRC(encoding=3, text=clip_id))
+            
+            
             # ✅ COMMENTAIRE - GitHub + Prompt/Style
             comment_lines = ["Downloaded with https://github.com/soaresden/SunoPlayerDownloader"]
             

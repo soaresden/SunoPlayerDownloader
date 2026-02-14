@@ -124,7 +124,7 @@ class PlaylistManager(tk.Frame):
         
         for i, clip_data in enumerate(self.playlist):
             clip = clip_data.get('clip', {})
-            title = clip.get('title', 'Sans titre')
+            title = clip.get('title', self.lang.get('common.untitled'))  # ⭐ TRADUIT
             clip_id = clip.get('id', '')[:8]
             
             prefix = "▶️ " if i == current_index else f"{i+1}. "
@@ -137,7 +137,10 @@ class PlaylistManager(tk.Frame):
             self.listbox.selection_set(current_index)
             self.listbox.see(current_index)
         
-        self.count_label.config(text=f"🎵 {self.lang.get('player.playlist')} ({len(self.playlist)})")
+        # ⭐ TRADUIT
+        self.count_label.config(
+            text=f"🎵 {self.lang.get('player.playlist')} ({len(self.playlist)})"
+        )
     
     def _on_double_click(self, event):
         """Double-clic → Joue"""
@@ -155,10 +158,10 @@ class PlaylistManager(tk.Frame):
         clip_data = self.playlist[index]
         
         menu = Menu(self, tearoff=0)
-        menu.add_command(label="▶️ Jouer", command=lambda: self.callbacks.get('on_play')(index))
-        menu.add_command(label="🖼️ Voir détails", command=lambda: self.callbacks.get('on_details')(clip_data))
+        menu.add_command(label=f"▶️ {self.lang.get('player.context_menu.play')}", command=lambda: self.callbacks.get('on_play')(index))
+        menu.add_command(label=f"🖼️ {self.lang.get('player.context_menu.view_details')}", command=lambda: self.callbacks.get('on_details')(clip_data))
         menu.add_separator()
-        menu.add_command(label="🗑️ Retirer", command=lambda: self.remove(index))
+        menu.add_command(label=f"🗑️ {self.lang.get('player.context_menu.remove')}", command=lambda: self.remove(index))
         
         try:
             menu.tk_popup(event.x_root, event.y_root)

@@ -1,15 +1,16 @@
 """
-Logique de lecture audio avec pygame
+Logique de lecture audio avec VLC - VERSION OPTIMALE POUR LA MUSIQUE
 """
 
-import pygame
+import vlc
 import threading
 import time
 from typing import Callable, Optional
+from pathlib import Path
 
 
 class AudioPlayer:
-    """Gestion de la lecture audio avec pygame"""
+    """Gestion de la lecture audio avec VLC"""
     
     def __init__(self, log_callback: Callable):
         """
@@ -23,19 +24,36 @@ class AudioPlayer:
         self.update_thread = None
         self.on_track_end = None  # Callback quand piste terminée
         self.on_progress_update = None  # Callback mise à jour progression
+        self.current_file = None
         
-        # Init pygame
+        # Init VLC
         try:
-            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
-            self.log("🎵 Pygame mixer initialisé")
+            self.instance = vlc.Instance('--no-xlib')  # Pour éviter les warnings
+            self.player = self.instance.media_player_new()
+            
+            # Event pour détecter fin de piste
+            self.event_manager = self.player.event_manager()
+            self.event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, self._on_end_reached)
+            
+            self.log("🎵 VLC player initialisé")
         except Exception as e:
-            self.log(f"⚠️ Erreur init pygame: {e}")
+            self.log(f"⚠️ Erreur init VLC: {e}")
     
     def load(self, filepath: str) -> bool:
         """Charge un fichier audio"""
         try:
-            pygame.mixer.music.load(filepath)
-            self.log(f"✅ Audio chargé: {filepath}")
+            self.log(f"📂 Chargement: {Path(filepath).name}")
+            
+            # Stop l'ancien fichier
+            if self.is_playing:
+                self.stop()
+            
+            # Crée le media
+            media = self.instance.media_new(filepath)
+            self.player.set_media(media)
+            self.current_file = filepath
+            
+            self.log(f"✅ Audio chargé: {Path(filepath).name}")
             return True
         except Exception as e:
             self.log(f"❌ Erreur chargement: {e}")
@@ -45,12 +63,12 @@ class AudioPlayer:
         """Démarre la lecture"""
         try:
             if self.is_paused:
-                pygame.mixer.music.unpause()
+                self.player.pause()  # VLC: pause() toggle pause/unpause
                 self.is_paused = False
                 self.is_playing = True
                 self.log("▶️ Reprise")
             else:
-                pygame.mixer.music.play()
+                self.player.play()
                 self.is_playing = True
                 self.log("▶️ Lecture démarrée")
                 
@@ -68,38 +86,55 @@ class AudioPlayer:
     def pause(self):
         """Met en pause"""
         if self.is_playing and not self.is_paused:
-            pygame.mixer.music.pause()
+            self.player.pause()
             self.is_paused = True
             self.is_playing = False
             self.log("⏸ Pause")
     
     def stop(self):
         """Arrête la lecture"""
-        pygame.mixer.music.stop()
+        self.player.stop()
         self.is_playing = False
         self.is_paused = False
         self.should_update = False
         self.log("⏹ Stop")
     
     def unload(self):
-        """Décharge pygame (pour libérer les fichiers)"""
+        """Décharge VLC (pour libérer les fichiers)"""
         try:
-            pygame.mixer.music.unload()
-            self.log("🔓 Pygame music déchargé")
+            self.player.stop()
+            self.current_file = None
+            self.log("🔓 VLC player déchargé")
         except:
             pass
     
     def get_position(self) -> float:
         """Récupère la position actuelle en secondes"""
         if self.is_playing and not self.is_paused:
-            pos_ms = pygame.mixer.music.get_pos()
-            if pos_ms > 0:
-                return pos_ms / 1000
+            time_ms = self.player.get_time()  # ms
+            if time_ms > 0:
+                return time_ms / 1000
         return 0
     
     def is_busy(self) -> bool:
         """Vérifie si une piste est en cours de lecture"""
-        return pygame.mixer.music.get_busy()
+        return self.player.is_playing() == 1
+    
+    def set_volume(self, volume: int):
+        """
+        Définit le volume (0-100)
+        
+        Args:
+            volume: Volume (0 = muet, 100 = max)
+        """
+        self.player.audio_set_volume(volume)
+    
+    def _on_end_reached(self, event):
+        """Callback VLC : piste terminée"""
+        self.log("✅ Piste terminée")
+        self.is_playing = False
+        if self.on_track_end:
+            self.on_track_end()
     
     def _update_progress(self):
         """Thread de mise à jour de la progression"""
@@ -111,12 +146,6 @@ class AudioPlayer:
                     # Callback mise à jour
                     if self.on_progress_update and pos_sec > 0:
                         self.on_progress_update(pos_sec)
-                    
-                    # Vérifie si piste terminée
-                    if not self.is_busy():
-                        self.log("✅ Piste terminée")
-                        if self.on_track_end:
-                            self.on_track_end()
                 
                 time.sleep(0.1)
             except Exception as e:
