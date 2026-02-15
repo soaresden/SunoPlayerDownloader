@@ -1,4 +1,5 @@
 # 🎵 Suno Downloader v2.0
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/c68a5aa8-02b3-49be-af63-71c51e4f4c45" />
 
 Application modulaire complète pour naviguer, écouter et télécharger vos projets Suno.
 
