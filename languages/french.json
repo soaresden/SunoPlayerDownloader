@@ -11,30 +11,33 @@
     "language": "🌍 Langue"
   },
   "projects": {
-    "title": "📁 PROJETS",
+    "title": "📁 Workspaces",
     "columns": {
-      "workspace": "WORKSPACE",
-      "count": "#",
-      "created": "CRÉÉ",
-      "updated": "MÀJ"
+		"workspace": "Workspace",
+		"count": "#",
+		"created": "Créé",
+		"updated": "MAJ"
     },
     "buttons": {
-      "sync": "🔄 SYNC",
-      "download_all": "📥 TOUT DL"
+        "sync": "🔄 Sync Selected Workspace",
+		"sync_all_non_synced": "🔄 Sync All Non-Synced",
+		"download_all": "📥 Download All"
     }
   },
   "clips": {
-    "title": "🎵 CLIPS",
-    "columns": {
-      "pin": "P",
-      "created": "CRÉÉ",
-      "title": "TITRE",
-      "style": "STYLE",
-      "duration": "⏱",
-      "download": "⬇️"
+      "title": "Clips",
+	  "columns": {
+      "pin": "📌",
+      "created": "Créé",
+      "title": "Titre",
+      "style": "Style",
+      "duration": "Durée",
+      "download": "DL"
     },
     "buttons": {
-      "download_all": "⬇️ TOUT",
+      "check_all": "✅ Tout Cocher pour DL",
+	  "uncheck_all": "❌ Tout Décocher",
+	  "download_all": "⬇️ TOUT",
       "download_checked": "⬇️ COCHÉS"
     },
     "context_menu": {
@@ -242,21 +245,20 @@
     "_UPLOADED": "_UPLOADED"
   },
 	"workspace_menu": {
-		"rename": "Renommer",
-		"delete": "Supprimer",
-		"rename_title": "Renommer le workspace",
-		"delete_title": "Supprimer le workspace ?",
-		"current_name": "Nom actuel",
-		"new_name": "Nouveau nom",
-		"workspace": "Workspace",
-		"clips": "Clips",
-		"warning_irreversible": "Cette action est IRRÉVERSIBLE !",
-		"confirm_delete": "Confirmer la suppression ?",
-		"success": "Succès",
-		"renamed": "Workspace renommé",
-		"deleted": "Workspace supprimé",
-		"error_rename": "Erreur lors du renommage",
-		"error_delete": "Erreur lors de la suppression"
+	  "rename": "Renommer",
+	  "delete": "Supprimer",
+	  "rename_title": "Renommer le workspace",
+	  "current_name": "Nom actuel",
+	  "new_name": "Nouveau nom",
+	  "success": "Succès",
+	  "renamed": "Workspace renommé",
+	  "error_rename": "Erreur lors du renommage",
+	  "delete_title": "Supprimer le workspace ?",
+	  "workspace": "Workspace",
+	  "clips": "Clips",
+	  "warning_irreversible": "Cette action est IRRÉVERSIBLE !",
+	  "confirm_delete": "Confirmer la suppression ?",
+	  "deleted": "Workspace supprimé",
+	  "error_delete": "Erreur lors de la suppression"
 }
-
 }

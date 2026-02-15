@@ -11,30 +11,33 @@
     "language": "🌍 Language"
   },
   "projects": {
-    "title": "📁 PROJECTS",
+    "title": "📁 Workspaces",
     "columns": {
-      "workspace": "WORKSPACE",
+      "workspace": "Workspace",
       "count": "#",
-      "created": "CREATED",
-      "updated": "UPDATED"
+      "created": "Created",
+      "updated": "Updated"
     },
     "buttons": {
-      "sync": "🔄 SYNC",
-      "download_all": "📥 ALL DL"
+		"sync": "🔄 Sync Selected Workspace",
+		"sync_all_non_synced": "🔄 Sync All Non-Synced",
+		"download_all": "📥 Download All"
     }
   },
   "clips": {
-    "title": "🎵 CLIPS",
-    "columns": {
-      "pin": "P",
-      "created": "CREATED",
-      "title": "TITLE",
-      "style": "STYLE",
-      "duration": "⏱",
-      "download": "⬇️"
+		"title": "Clips",
+		"columns": {
+      "pin": "📌",
+      "created": "Created",
+      "title": "Title",
+      "style": "Style",
+      "duration": "Duration",
+      "download": "DL"
     },
     "buttons": {
-      "download_all": "⬇️ ALL",
+      "check_all": "✅ Check All for DL",
+	  "uncheck_all": "❌ Uncheck All",
+	  "download_all": "⬇️ ALL",
       "download_checked": "⬇️ CHECKED"
     },
     "context_menu": {
@@ -241,21 +244,21 @@
     "uploading": "Uploading...",
     "_UPLOADED": "_UPLOADED"
   },
-"workspace_menu": {
-    "rename": "Rename",
-    "delete": "Delete",
-    "rename_title": "Rename workspace",
-    "delete_title": "Delete workspace?",
-    "current_name": "Current name",
-    "new_name": "New name",
-    "workspace": "Workspace",
-    "clips": "Clips",
-    "warning_irreversible": "This action is IRREVERSIBLE!",
-    "confirm_delete": "Confirm deletion?",
-    "success": "Success",
-    "renamed": "Workspace renamed",
-    "deleted": "Workspace deleted",
-    "error_rename": "Error renaming",
-    "error_delete": "Error deleting"
+	"workspace_menu": {
+		"rename": "Rename",
+		"delete": "Delete",
+		"rename_title": "Rename workspace",
+		"delete_title": "Delete workspace?",
+		"current_name": "Current name",
+		"new_name": "New name",
+		"workspace": "Workspace",
+		"clips": "Clips",
+		"warning_irreversible": "This action is IRREVERSIBLE!",
+		"confirm_delete": "Confirm deletion?",
+		"success": "Success",
+		"renamed": "Workspace renamed",
+		"deleted": "Workspace deleted",
+		"error_rename": "Error renaming",
+		"error_delete": "Error deleting"
 }
 }

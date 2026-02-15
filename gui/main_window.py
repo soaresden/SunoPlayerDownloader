@@ -87,9 +87,11 @@ class SunoMainWindow:
             on_select=self.callbacks.on_project_select,
             on_download_all=self.callbacks.download_all_projects,
             on_sync=self.callbacks.sync_project,
+            on_sync_all_non_synced=self.callbacks.sync_all_non_synced,  # ⭐ NOUVEAU
             lang_manager=self.lang
         )
         self.projects_panel.pack(fill=tk.BOTH, expand=True)
+        
         
         # COLONNE 2: Clips Panel
         self.clips_panel = ClipsPanel(content, {
@@ -108,7 +110,14 @@ class SunoMainWindow:
         
         self.player_panel = PlayerPanel(player_container, log_callback=self.log, lang_manager=self.lang)
         self.player_panel.pack(fill=tk.BOTH, expand=True)
-    
+        self.player_panel.on_download_complete = self._on_download_complete
+
+    def _on_download_complete(self):
+        """Rafraîchit les couleurs après download"""
+        self.log("🔄 Rafraîchissement des workspaces...")
+        if hasattr(self.projects_panel, 'refresh_colors'):
+            self.projects_panel.refresh_colors()
+            
     def log(self, key: str, **kwargs):
         """Log un message traduit"""
         message = self.lang.get(key, **kwargs)

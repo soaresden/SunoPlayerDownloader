@@ -1,11 +1,13 @@
 """
-Panel d'affichage des projets avec chargement progressif
+Panel d'affichage des projets avec chargement progressif et codes couleur
 """
 
 import tkinter as tk
 from tkinter import ttk
 from typing import List, Dict, Callable
 import threading
+import os
+from pathlib import Path
 from config import *
 from utils.formatters import format_date
 from utils.treeview_sorter import make_treeview_sortable
@@ -14,7 +16,7 @@ from utils.treeview_sorter import make_treeview_sortable
 class ProjectsPanel(tk.Frame):
     """Panel contenant la liste des projets"""
     
-    def __init__(self, parent, on_select: Callable, on_download_all: Callable, on_sync: Callable, lang_manager):
+    def __init__(self, parent, on_select, on_download_all, on_sync, on_sync_all_non_synced, lang_manager):
         """
         Args:
             parent: Widget parent
@@ -28,18 +30,16 @@ class ProjectsPanel(tk.Frame):
         self.on_select = on_select
         self.callbacks = {
             'on_download_all': on_download_all,
-            'on_sync': on_sync
+            'on_sync': on_sync,
+            'on_sync_all_non_synced': on_sync_all_non_synced  # ⭐ NOUVEAU
         }
+
         self.lang = lang_manager
         
-        # Map pour retrouver le project_id depuis l'item TreeView
-        self.item_to_project = {}  # item_id -> project_id
-        
-        # Variable pour stocker le client
+        # Variables
         self.client = None  # Sera défini par set_client()
-        
-        # Variable pour stocker tous les projets (pour menu contextuel)
-        self.all_projects = []
+        self.all_projects = []  # Pour le menu contextuel - IMPORTANT !
+        self.item_to_project = {}  # item_id -> project_id
         
         # Header
         self._create_header()
@@ -86,33 +86,52 @@ class ProjectsPanel(tk.Frame):
         btn_frame.pack(fill=tk.X, padx=5, pady=(0, 5))
         btn_frame.pack_propagate(False)
         
-        # SYNC
+        # Boutons - 3 boutons verticaux
+        btn_frame = tk.Frame(self, bg=COLOR_PRIMARY)
+        btn_frame.pack(fill=tk.X, padx=5, pady=(0, 5))
+
+        # SYNC SELECTED
         tk.Button(
             btn_frame,
             text=self.lang.get("projects.buttons.sync"),
-            font=("Arial", 9, "bold"),
+            font=("Arial", 8, "bold"),
             bg=COLOR_SUCCESS,
             fg="white",
             relief=tk.FLAT,
             cursor="hand2",
-            padx=10,
-            pady=6,
+            padx=8,
+            pady=5,
             command=self.callbacks.get('on_sync')
-        ).pack(side=tk.LEFT, fill=tk.Y, expand=True, padx=(0, 2))
-        
-        # TOUT DL
+        ).pack(side=tk.TOP, fill=tk.X, pady=(0, 2))
+
+        # ⭐ NOUVEAU : SYNC ALL NON-SYNCED
+        tk.Button(
+            btn_frame,
+            text=self.lang.get("projects.buttons.sync_all_non_synced"),
+            font=("Arial", 8, "bold"),
+            bg="#ff8800",  # Orange
+            fg="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=5,
+            command=self.callbacks.get('on_sync_all_non_synced')
+        ).pack(side=tk.TOP, fill=tk.X, pady=(0, 2))
+
+        # DOWNLOAD ALL
         tk.Button(
             btn_frame,
             text=self.lang.get("projects.buttons.download_all"),
-            font=("Arial", 9, "bold"),
+            font=("Arial", 8, "bold"),
             bg=COLOR_SUNO_ORANGE,
             fg="white",
             relief=tk.FLAT,
             cursor="hand2",
-            padx=10,
-            pady=6,
+            padx=8,
+            pady=5,
             command=self.callbacks.get('on_download_all')
-        ).pack(side=tk.RIGHT, fill=tk.Y, expand=True, padx=(2, 0))
+        ).pack(side=tk.TOP, fill=tk.X)
+
     
     def _create_treeview(self):
         """Crée le TreeView"""
@@ -138,11 +157,18 @@ class ProjectsPanel(tk.Frame):
         self.tree.heading("created", text=self.lang.get('projects.columns.created'))
         self.tree.heading("updated", text=self.lang.get('projects.columns.updated'))
         
-        # ⭐ Largeurs ajustées
+        # Largeurs ajustées
         self.tree.column("workspace", width=150)
         self.tree.column("count", width=30, anchor=tk.CENTER)
         self.tree.column("created", width=85)
         self.tree.column("updated", width=85)
+        
+        # ⭐ TAGS COLORÉS
+        # 🔴 ROUGE : Dossier n'existe pas → À télécharger
+        self.tree.tag_configure('no_folder', background='#ffcccc', foreground='#cc0000')
+        
+        # 🟡 JAUNE : Dossier existe mais nombre différent → À SYNC
+        self.tree.tag_configure('need_sync', background='#ffffcc', foreground='#cc9900')
         
         self.tree.pack(fill=tk.BOTH, expand=True)
         
@@ -151,10 +177,6 @@ class ProjectsPanel(tk.Frame):
         
         # Bind de sélection
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
-        
-        # ⭐ NOUVEAU : Menu contextuel (clic droit)
-        self.tree.bind('<Button-3>', self._on_right_click)  # Windows/Linux
-        self.tree.bind('<Button-2>', self._on_right_click)  # Mac
     
     def _setup_sorting(self):
         """Active le tri"""
@@ -211,6 +233,86 @@ class ProjectsPanel(tk.Frame):
         
         return oldest_date or ''
     
+    def _sanitize_filename(self, filename: str) -> str:
+        """
+        Nettoie un nom de fichier (même algo que audio_cache)
+        """
+        import re
+        filename = re.sub(r'[<>:"/\\|?*]', '-', filename)
+        if len(filename) > 80:
+            filename = filename[:80]
+        return filename.strip()
+    
+    def _count_mp3_in_folder(self, folder_path: Path) -> int:
+        """
+        Compte le nombre de MP3 dans un dossier
+        
+        Args:
+            folder_path: Chemin du dossier
+        
+        Returns:
+            Nombre de fichiers MP3
+        """
+        if not folder_path.exists():
+            return 0
+        
+        count = 0
+        try:
+            for file in folder_path.iterdir():
+                if file.is_file() and file.suffix.lower() == '.mp3':
+                    count += 1
+        except:
+            pass
+        
+        return count
+    
+    def _check_folder_status(self, workspace_name: str, clip_count: int) -> str:
+        """
+        Vérifie le statut d'un workspace
+        
+        Args:
+            workspace_name: Nom du workspace
+            clip_count: Nombre de clips sur Suno
+        
+        Returns:
+            'ok' = Tout bon (même nombre)
+            'need_sync' = Dossier existe mais nombre différent → JAUNE
+            'no_folder' = Dossier n'existe pas → ROUGE
+        """
+        safe_name = self._sanitize_filename(workspace_name)
+        
+        # Cherche dans DOWNLOADS
+        downloads_folder = Path(DOWNLOADS_PATH) / f"Suno-{safe_name}"
+        
+        # Cherche dans MUSIK (dossiers Suno*)
+        musik_folders = []
+        if Path(MUSIK_LIBRARY_PATH).exists():
+            for folder in Path(MUSIK_LIBRARY_PATH).iterdir():
+                if folder.is_dir() and folder.name.lower().startswith('suno'):
+                    # Vérifie si le nom du workspace est dans le nom du dossier
+                    if safe_name.lower() in folder.name.lower():
+                        musik_folders.append(folder)
+        
+        # Compte les MP3 dans tous les dossiers trouvés
+        total_mp3 = 0
+        
+        if downloads_folder.exists():
+            total_mp3 += self._count_mp3_in_folder(downloads_folder)
+        
+        for musik_folder in musik_folders:
+            total_mp3 += self._count_mp3_in_folder(musik_folder)
+        
+        # Décision
+        if total_mp3 == 0:
+            # Aucun MP3 trouvé → ROUGE
+            return 'no_folder'
+        elif total_mp3 != clip_count:
+            # Nombre différent → JAUNE (à sync)
+            return 'need_sync'
+        else:
+            # Même nombre → OK
+            return 'ok'
+    
     def load_projects(self, projects: List[Dict]):
         """
         Charge les projets dans le TreeView
@@ -219,7 +321,7 @@ class ProjectsPanel(tk.Frame):
         Args:
             projects: Liste des projets (sans clips au départ)
         """
-        # Sauvegarde pour le menu contextuel
+        # ⭐ IMPORTANT : Sauvegarde pour le menu contextuel
         self.all_projects = projects
         
         # Efface
@@ -238,12 +340,23 @@ class ProjectsPanel(tk.Frame):
             updated = self._format_datetime(updated_raw)
             
             # Created = "⏳" au départ (sera chargé en arrière-plan)
-            created = '⏳'  # Indicateur de chargement
+            created = '⏳'
             
-            # Insère dans le TreeView
-            item_id = self.tree.insert('', 'end', values=(name, count, created, updated))
+            # ⭐ NOUVEAU : Vérifie le statut (rouge/jaune/ok)
+            status = self._check_folder_status(name, count)
             
-            # ⭐ Sauvegarde l'association item_id -> project_id
+            # Insère dans le TreeView avec le bon tag
+            if status == 'no_folder':
+                # 🔴 ROUGE : Dossier n'existe pas
+                item_id = self.tree.insert('', 'end', values=(name, count, created, updated), tags=('no_folder',))
+            elif status == 'need_sync':
+                # 🟡 JAUNE : Nombre différent
+                item_id = self.tree.insert('', 'end', values=(name, count, created, updated), tags=('need_sync',))
+            else:
+                # ⚫ NORMAL : Tout OK
+                item_id = self.tree.insert('', 'end', values=(name, count, created, updated))
+            
+            # Sauvegarde l'association item_id -> project_id
             self.item_to_project[item_id] = project_id
         
         self.count_label.config(text=str(len(projects)))
@@ -264,6 +377,7 @@ class ProjectsPanel(tk.Frame):
             
             for index, project in enumerate(projects, 1):
                 project_id = project.get('id', '')
+                
                 if not project_id:
                     continue
                 
@@ -306,7 +420,7 @@ class ProjectsPanel(tk.Frame):
         # Met à jour le label de chargement
         self.loading_label.config(text=f"⏳ {current}/{total}")
         
-        # ⭐ Trouve l'item_id depuis le project_id
+        # Trouve l'item_id depuis le project_id
         item_id = None
         for iid, pid in self.item_to_project.items():
             if pid == project_id:
@@ -331,7 +445,7 @@ class ProjectsPanel(tk.Frame):
         if selection:
             item_id = selection[0]
             
-            # ⭐ CORRECTION : Récupère le vrai project_id
+            # Récupère le vrai project_id
             project_id = self.item_to_project.get(item_id)
             
             if project_id:
@@ -379,20 +493,21 @@ class ProjectsPanel(tk.Frame):
                 break
         
         if not project:
+            print(f"⚠️ Projet non trouvé dans all_projects : {project_id}")
             return
         
         # Crée le menu contextuel
         menu = Menu(self, tearoff=0)
         
         menu.add_command(
-            label=f"✏️  {self.lang.get('workspace_menu.rename', 'Renommer')}",
+            label=f"✏️  {self.lang.get('workspace_menu.rename')}",
             command=lambda: self._rename_workspace(project)
         )
         
         menu.add_separator()
         
         menu.add_command(
-            label=f"🗑️  {self.lang.get('workspace_menu.delete', 'Supprimer')}",
+            label=f"🗑️  {self.lang.get('workspace_menu.delete')}",
             command=lambda: self._delete_workspace(project)
         )
         
@@ -402,51 +517,38 @@ class ProjectsPanel(tk.Frame):
         finally:
             menu.grab_release()
     
-    def _rename_workspace(self, project: dict):
-        """Dialogue pour renommer un workspace"""
-        from tkinter import simpledialog, messagebox
+    def _rename_workspace(self, project_id: str):
+        """Renomme un workspace"""
+        from tkinter import simpledialog
         
-        project_id = project.get('id')
-        old_name = project.get('name', 'Unknown')
+        # Trouve le projet
+        project = None
+        for p in self.all_projects:
+            if p.get('id') == project_id:
+                project = p
+                break
         
-        # Dialogue simple
-        new_name = simpledialog.askstring(
-            self.lang.get('workspace_menu.rename_title', 'Renommer le workspace'),
-            f"{self.lang.get('workspace_menu.current_name', 'Nom actuel')} : {old_name}\n\n{self.lang.get('workspace_menu.new_name', 'Nouveau nom')} :",
-            initialvalue=old_name
-        )
-        
-        if not new_name or new_name == old_name:
+        if not project:
             return
         
-        # Renomme via API
-        try:
-            print(f"🔄 Renommage : '{old_name}' → '{new_name}'")
-            
-            if self.client:
-                result = self.client.rename_project(project_id, new_name)
-                
-                print(f"✅ Workspace renommé : '{old_name}' → '{new_name}'")
-                
-                messagebox.showinfo(
-                    self.lang.get('workspace_menu.success', 'Succès'),
-                    f"{self.lang.get('workspace_menu.renamed', 'Workspace renommé')} :\n'{old_name}' → '{new_name}'"
-                )
-                
-                # Recharge la liste des projets
-                self.master.after(500, lambda: self._refresh_projects())
-            else:
-                messagebox.showerror(
-                    "Erreur",
-                    "Client API non disponible"
-                )
+        current_name = project.get('name', 'Unknown')
         
-        except Exception as e:
-            print(f"❌ Erreur renommage : {e}")
-            messagebox.showerror(
-                "Erreur",
-                f"{self.lang.get('workspace_menu.error_rename', 'Erreur lors du renommage')} :\n{e}"
-            )
+        # ⭐ Popup avec nom pré-rempli
+        new_name = simpledialog.askstring(
+            "Renommer le workspace",
+            f"Nom actuel: {current_name}\n\nNouveau nom:",
+            initialvalue=current_name  # ⭐ IMPORTANT
+        )
+        
+        if not new_name or new_name == current_name:
+            return
+        
+        # Met à jour localement
+        project['name'] = new_name
+        self.load_projects(self.all_projects)
+        
+        self.log(f"✅ Renommé : {current_name} → {new_name}")
+        messagebox.showinfo("Succès", f"✅ Workspace renommé\n\n{current_name} → {new_name}")
     
     def _delete_workspace(self, project: dict):
         """Dialogue pour supprimer un workspace"""
@@ -489,10 +591,7 @@ class ProjectsPanel(tk.Frame):
                 else:
                     raise Exception("Aucune méthode de suppression n'a fonctionné")
             else:
-                messagebox.showerror(
-                    "Erreur",
-                    "Client API non disponible"
-                )
+                messagebox.showerror("Erreur", "Client API non disponible")
         
         except Exception as e:
             print(f"❌ Erreur suppression : {e}")
@@ -514,5 +613,25 @@ class ProjectsPanel(tk.Frame):
                 self.load_projects(projects)
                 
                 print("✅ Liste rechargée")
-            except Exception as e:
+            except Exception as e   :
                 print(f"❌ Erreur rechargement : {e}")
+    
+    def refresh_colors(self):
+        """Rafraîchit les couleurs de tous les workspaces"""
+        for item in self.tree.get_children():
+            values = self.tree.item(item, 'values')
+            if len(values) >= 2:
+                workspace_name = values[0]
+                clip_count_str = str(values[1])
+                clip_count = int(clip_count_str) if clip_count_str.isdigit() else 0
+                
+                status = self._check_folder_status(workspace_name, clip_count)
+                
+                if status == 'ok':
+                    self.tree.item(item, tags=('ok',))
+                elif status == 'need_sync':
+                    self.tree.item(item, tags=('need_sync',))
+                else:
+                    self.tree.item(item, tags=('no_folder',))
+        
+        # ✅ Pas de self.log (n'existe pas dans ProjectsPanel)

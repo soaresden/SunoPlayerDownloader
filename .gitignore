@@ -1,4 +1,4 @@
 *pycache*
-*.pyc
 suno_cookies*
 downloads/*
+{api,gui,widgets,utils}

@@ -100,7 +100,7 @@ class SunoClient:
     
     def get_project_clips(self, project_id: str) -> Dict:
         """
-        Récupère les détails d'un projet avec tous ses clips
+        Récupère les détails d'un projet avec TOUS ses clips (pagination)
         
         Args:
             project_id: ID du projet
@@ -110,9 +110,47 @@ class SunoClient:
         """
         self._add_browser_token()
         
-        response = self.session.get(f"{SUNO_BASE_URL}/api/project/{project_id}")
-        response.raise_for_status()
-        return response.json()
+        # ⭐ NOUVEAU : Pagination pour récupérer TOUS les clips
+        all_project_clips = []
+        all_pinned_clips = []
+        page = 1
+        
+        while True:
+            # Récupère une page
+            response = self.session.get(
+                f"{SUNO_BASE_URL}/api/project/{project_id}",
+                params={'page': page}
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            # Récupère les clips de cette page
+            project_clips = data.get('project_clips', [])
+            pinned_clips = data.get('pinned_clips', [])
+            
+            # Ajoute au total
+            all_project_clips.extend(project_clips)
+            
+            # Pinned clips seulement sur la première page
+            if page == 1:
+                all_pinned_clips = pinned_clips
+            
+            # Si moins de 20 clips, c'est la dernière page
+            if len(project_clips) < 20:
+                break
+            
+            page += 1
+            time.sleep(0.2)  # Rate limiting
+        
+        return {
+            'project_clips': all_project_clips,
+            'pinned_clips': all_pinned_clips,
+            'is_owned': data.get('is_owned', True),
+            'is_trashed': data.get('is_trashed', False),
+            'clip_count': data.get('clip_count', 0),
+            'current_page': 1,
+            'shared': data.get('shared', False)
+        }
     
     def download_clip(self, clip_url: str, output_path: str) -> bool:
         """

@@ -29,6 +29,7 @@ class PlayerPanel(tk.Frame):
         self.lang = lang_manager
         self.current_index = -1
         self.current_workspace = ""
+        self.on_download_complete = None  # ⭐ AJOUTE
         self.current_duration = 0
         
         # Cache audio
@@ -260,28 +261,169 @@ class PlayerPanel(tk.Frame):
         })
     
     def _download_all(self, clips: list):
-        """Télécharge tous"""
+        """Télécharge tous les clips (avec vérification Downloads + Musik) - THREADED"""
         if not clips:
             return
-        
-        self.stop()
-        self.audio_player.unload()
-        
-        self.log(f"📥 Téléchargement de {len(clips)} clip(s)")
-        
-        sorted_clips = sorted(clips, key=lambda c: c.get('clip', {}).get('created_at', ''))
-        
-        success = 0
-        for i, clip_data in enumerate(sorted_clips, 1):
-            filepath = self.audio_cache.get_audio_path(clip_data, self.current_workspace, permanent=True, track_number=i)
-            if filepath:
-                success += 1
-                clip = clip_data.get('clip', {})
-                self.audio_cache.delete_temp_file(clip.get('id', ''), clip.get('title', ''))
-        
-        self.log(f"✅ {success}/{len(clips)} téléchargé(s)")
-        messagebox.showinfo("Terminé", f"✅ {success} fichier(s) téléchargé(s)")
-    
+
+        def download_task():
+            import re
+            from pathlib import Path
+            from mutagen.mp3 import MP3
+            from collections import defaultdict
+            from config import DOWNLOADS_PATH, MUSIK_LIBRARY_PATH
+
+            # ------------------------------------------------------------------
+            # 1) FIX CRITIQUE : clips est TOUJOURS défini
+            # ------------------------------------------------------------------
+            local_clips = clips[:]  # copie sécurisée
+            if not isinstance(local_clips, list):
+                local_clips = []
+
+            # ------------------------------------------------------------------
+            # 2) Détection workspace
+            # ------------------------------------------------------------------
+            if not self.current_workspace:
+                # Essaye depuis les clips
+                if local_clips:
+                    ws = local_clips[0].get("_workspace_name")
+                    if ws:
+                        self.current_workspace = ws
+
+            # Essaye depuis la fenêtre principale
+            if not self.current_workspace:
+                try:
+                    root = self.winfo_toplevel()
+                    if hasattr(root, "current_project"):
+                        self.current_workspace = root.current_project.get("name", "Unknown")
+                except:
+                    pass
+
+            if not self.current_workspace:
+                self.current_workspace = "Unknown"
+
+            safe_name = re.sub(r'[<>:"/\\|?*]', '-', self.current_workspace).strip()
+            if len(safe_name) > 80:
+                safe_name = safe_name[:80]
+
+            # ------------------------------------------------------------------
+            # 3) Scan des fichiers existants
+            # ------------------------------------------------------------------
+            self.stop()
+            self.audio_player.unload()
+
+            self.log(f"📥 Vérification de {len(local_clips)} clip(s)...")
+
+            existing_ids = set()
+
+            def scan_folder(folder_path: Path):
+                if not folder_path.exists():
+                    return
+                for file in folder_path.rglob("*.mp3"):
+                    try:
+                        audio = MP3(file)
+                        if "TSRC" in audio.tags:
+                            existing_ids.add(str(audio.tags["TSRC"]))
+                        elif "COMM::eng" in audio.tags:
+                            existing_ids.add(str(audio.tags["COMM::eng"]))
+                        elif "TXXX:SUNO_ID" in audio.tags:
+                            existing_ids.add(str(audio.tags["TXXX:SUNO_ID"]))
+                    except:
+                        pass
+
+            downloads_folder = Path(DOWNLOADS_PATH) / f"Suno-{safe_name}"
+            scan_folder(downloads_folder)
+
+            musik_path = Path(MUSIK_LIBRARY_PATH)
+            if musik_path.exists():
+                for folder in musik_path.iterdir():
+                    if folder.is_dir() and safe_name.lower() in folder.name.lower():
+                        scan_folder(folder)
+
+            self.log(f"✅ {len(existing_ids)} clip(s) déjà en local")
+
+            # ------------------------------------------------------------------
+            # 4) Filtrage des clips à télécharger
+            # ------------------------------------------------------------------
+            sorted_clips = sorted(local_clips, key=lambda c: c.get("clip", {}).get("created_at", ""))
+
+            to_download = []
+            skipped = 0
+
+            for clip_data in sorted_clips:
+                clip_id = clip_data.get("clip", {}).get("id", "")
+                if clip_id in existing_ids:
+                    skipped += 1
+                    self.log(f"  ⏭️ Déjà présent : {clip_data.get('clip', {}).get('title', '')[:40]}")
+                else:
+                    to_download.append(clip_data)
+
+            if skipped > 0:
+                self.log(f"⏭️ {skipped} clip(s) ignoré(s) (déjà présents)")
+
+            if not to_download:
+                def show_msg():
+                    messagebox.showinfo("Info", "✅ Tous les clips sont déjà téléchargés !")
+                self.master.after(0, show_msg)
+                return
+
+            # ------------------------------------------------------------------
+            # 5) Téléchargement regroupé par workspace
+            # ------------------------------------------------------------------
+            clips_by_workspace = defaultdict(list)
+            for clip_data in to_download:
+                ws = clip_data.get("_workspace_name", self.current_workspace)
+                if not ws:
+                    ws = self.current_workspace
+                clips_by_workspace[ws].append(clip_data)
+
+            self.log(f"📥 Téléchargement de {len(to_download)} clip(s) dans {len(clips_by_workspace)} workspace(s)...")
+
+            success = 0
+            global_index = 0
+
+            for workspace, ws_clips in clips_by_workspace.items():
+                self.log("")
+                self.log(f"📁 Workspace : {workspace} ({len(ws_clips)} clip(s))")
+
+                ws_clips.sort(key=lambda x: x.get("clip", {}).get("created_at", ""))
+
+                for track_num, clip_data in enumerate(ws_clips, 1):
+                    global_index += 1
+                    clip = clip_data.get("clip", {})
+                    title = clip.get("title", "Sans titre")
+
+                    self.log(f"[{global_index}/{len(to_download)}] 📥 {workspace}/{track_num:03d} - {title[:40]}")
+
+                    filepath = self.audio_cache.get_audio_path(
+                        clip_data,
+                        workspace,
+                        permanent=True,
+                        track_number=track_num
+                    )
+
+                    if filepath:
+                        success += 1
+                        self.audio_cache.delete_temp_file(clip.get("id", ""), title)
+
+            # ------------------------------------------------------------------
+            # 6) Message final
+            # ------------------------------------------------------------------
+            def show_final():
+                messagebox.showinfo("Terminé", f"✅ {success} fichier(s) téléchargé(s)\n⏭️ {skipped} déjà présent(s)")
+                if self.on_download_complete:
+                    self.on_download_complete()
+
+            self.master.after(0, show_final)
+
+        # ----------------------------------------------------------------------
+        # Lancement threadé
+        # ----------------------------------------------------------------------
+        import threading
+        threading.Thread(target=download_task, daemon=True).start()
+
+
+
+
     def _download_one(self, clip_data: dict, index: int):
         """Télécharge un clip"""
         clip = clip_data.get('clip', {})

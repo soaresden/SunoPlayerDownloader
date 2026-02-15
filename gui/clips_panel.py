@@ -71,24 +71,40 @@ class ClipsPanel(tk.Frame):
         btns.pack(fill=tk.X)
         btns.pack_propagate(False)
         
-        self.btn_download_all = tk.Button(
+        # ⭐ NOUVEAU : Tout Cocher pour DL
+        self.btn_check_all = tk.Button(
             btns,
-            text=f"⬇️ {self.lang.get('clips.buttons.download_all')}",
+            text=self.lang.get('clips.buttons.check_all'),
             font=("Arial", 8, "bold"),
-            bg=COLOR_DANGER,
+            bg=COLOR_INFO,
             fg="white",
             relief=tk.FLAT,
             padx=8,
             pady=4,
-            command=self.callbacks.get('download_all')
+            command=self._check_all
         )
-        self.btn_download_all.pack(side=tk.LEFT, padx=3, pady=3)
+        self.btn_check_all.pack(side=tk.LEFT, padx=3, pady=3)
         
-        self.btn_download_checked = tk.Button(
+        # ⭐ NOUVEAU : Tout Décocher
+        self.btn_uncheck_all = tk.Button(
             btns,
-            text=f"⬇️ {self.lang.get('clips.buttons.download_checked')}",
+            text=self.lang.get('clips.buttons.uncheck_all'),
             font=("Arial", 8, "bold"),
             bg=COLOR_WARNING,
+            fg="white",
+            relief=tk.FLAT,
+            padx=8,
+            pady=4,
+            command=self._uncheck_all
+        )
+        self.btn_uncheck_all.pack(side=tk.LEFT, padx=3, pady=3)
+        
+        # Download Checked
+        self.btn_download_checked = tk.Button(
+            btns,
+            text=self.lang.get('clips.buttons.download_checked'),
+            font=("Arial", 8, "bold"),
+            bg=COLOR_SUCCESS,
             fg="white",
             relief=tk.FLAT,
             padx=8,
@@ -113,6 +129,10 @@ class ClipsPanel(tk.Frame):
             selectmode="extended",
             height=18
         )
+
+        self.tree.tag_configure('checked', background='#cce5ff', foreground='#0066cc')
+
+
         clips_vsb.config(command=self.tree.yview)
         
         # Colonnes
@@ -182,8 +202,12 @@ class ClipsPanel(tk.Frame):
             dur_str = format_duration(dur)
             
             self.tree.insert("", tk.END, iid=cid,
-                           values=(pin, created, title_with_id, tags, dur_str, ""))
-        
+               values=(pin, created, title_with_id, tags, dur_str, ""))
+
+            # ⭐ NOUVEAU : Applique le tag si déjà coché
+            if cid in self.download_checked:
+                self.tree.item(cid, tags=('checked',))
+    
         self.count_label.config(text=str(len(clips)))
         self.log(f"✅ {len(clips)} clips affichés dans le TreeView")
         
@@ -195,34 +219,36 @@ class ClipsPanel(tk.Frame):
         if region != "cell":
             return
         
+        # Identifie la colonne
         column = self.tree.identify_column(event.x)
-        item = self.tree.identify_row(event.y)
-        
-        if not item:
+        if column != "#6":  # Colonne "dl" (6ème colonne)
             return
         
-        # Colonne 6 = Download checkbox
-        if column == "#6":
-            # Trouve le clip complet
-            clip_data = self._find_clip(item)
-            if not clip_data:
-                return
-            
-            if item in self.download_checked:
-                # ❌ DÉCOCHE
-                self.download_checked.remove(item)
-                self.log(f"❌ Retiré de DL: {item[:8]}")
-            else:
-                # ✅ COCHE
-                self.download_checked.add(item)
-                self.log(f"✅ Ajouté à DL: {item[:8]}")
-                
-                # ⭐ AJOUTE À LA LISTBOX DOWNLOADS
-                callback = self.callbacks.get('add_to_download')
-                if callback:
-                    callback(clip_data)
-            
-            self._update_checkboxes()
+        # Identifie l'item
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
+            return
+        
+        # clip_id = item_id (l'iid du TreeView)
+        clip_id = item_id
+        
+        # Toggle checkbox via values (index 5 = colonne "dl")
+        current_values = list(self.tree.item(item_id, 'values'))
+        
+        if current_values[5] == '':  # Pas coché
+            # Coche
+            current_values[5] = '☑'
+            self.tree.item(item_id, values=current_values)
+            self.download_checked.add(clip_id)
+            self.tree.item(item_id, tags=('checked',))
+        else:
+            # Décoche
+            current_values[5] = ''
+            self.tree.item(item_id, values=current_values)
+            self.download_checked.discard(clip_id)
+            self.tree.item(item_id, tags=())
+        
+        self.log(f"📝 {len(self.download_checked)} clip(s) sélectionné(s)")
         
     def _update_checkboxes(self):
         """Met à jour l'affichage des checkboxes"""
@@ -427,6 +453,38 @@ class ClipsPanel(tk.Frame):
         
         if self.callbacks.get('download_checked'):
             self.callbacks['download_checked'](clips_to_download)
+    
+    def _check_all(self):
+        """Coche tous les clips"""
+        for item_id in self.tree.get_children():
+            # Utilise values (index 5 = colonne "dl")
+            current_values = list(self.tree.item(item_id, 'values'))
+            current_values[5] = '☑'
+            self.tree.item(item_id, values=current_values)
+            
+            # Ajoute au set
+            self.download_checked.add(item_id)
+            
+            # Applique tag coloré
+            self.tree.item(item_id, tags=('checked',))
+        
+        self.log(f"✅ Tous les clips cochés ({len(self.download_checked)} clips)")
+    
+    def _uncheck_all(self):
+        """Décoche tous les clips"""
+        for item_id in self.tree.get_children():
+            # Utilise values (index 5 = colonne "dl")
+            current_values = list(self.tree.item(item_id, 'values'))
+            current_values[5] = ''
+            self.tree.item(item_id, values=current_values)
+            
+            # Retire du set
+            self.download_checked.discard(item_id)
+            
+            # Retire tag
+            self.tree.item(item_id, tags=())
+        
+        self.log(f"❌ Tous les clips décochés")
     
     def update_texts(self):
         """Met à jour les textes après changement de langue"""

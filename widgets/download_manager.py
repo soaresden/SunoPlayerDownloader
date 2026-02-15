@@ -1,170 +1,214 @@
 """
-Gestionnaire de téléchargements pour le player
+Gestionnaire de liste de téléchargement
 """
 
 import tkinter as tk
-from tkinter import Listbox, Menu
+from tkinter import ttk, messagebox
 from typing import List, Dict, Callable
-from config import COLOR_CARD_BG, COLOR_DARK_BG, COLOR_SUNO_ORANGE, COLOR_TEXT_LIGHT, COLOR_DANGER
 
 
 class DownloadManager(tk.Frame):
-    """Gestion de la liste de téléchargements"""
+    """Widget de gestion de la liste de téléchargement"""
     
     def __init__(self, parent, callbacks: dict, lang_manager):
         """
         Args:
             parent: Widget parent
-            callbacks: Dict des callbacks
+            callbacks: Dict des callbacks :
+                - on_clear: () -> None
+                - on_download_all: (download_list: List[Dict]) -> None
             lang_manager: Gestionnaire de langues
         """
-        super().__init__(parent, bg=COLOR_CARD_BG)
-        
-        self.callbacks = callbacks
+        super().__init__(parent, bg="#2c3e50")
+        self.callbacks = callbacks or {}
         self.lang = lang_manager
-        self.download_list = []
+        self.download_list: List[Dict] = []
         
         self._create_ui()
     
+    # -------------------------------------------------------------------------
+    # UI
+    # -------------------------------------------------------------------------
     def _create_ui(self):
         """Crée l'interface"""
         # Header
-        header = tk.Frame(self, bg=COLOR_CARD_BG)
+        header = tk.Frame(self, bg="#2c3e50", height=30)
         header.pack(fill=tk.X)
+        header.pack_propagate(False)
         
-        self.count_label = tk.Label(
+        self.title_label = tk.Label(
             header,
-            text=f"⬇️ {self.lang.get('player.downloads')} (0)",
-            font=("Arial", 9, "bold"),
-            bg=COLOR_CARD_BG,
-            fg=COLOR_SUNO_ORANGE
+            text="📥 À télécharger (0)",
+            font=("Arial", 10, "bold"),
+            bg="#2c3e50",
+            fg="white"
         )
-        self.count_label.pack(side=tk.LEFT, pady=3)
+        self.title_label.pack(side=tk.LEFT, padx=5)
         
-        # Listbox
-        list_frame = tk.Frame(self, bg=COLOR_DARK_BG, bd=1, relief=tk.SOLID)
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=3)
+        # Bouton Clear
+        clear_btn = tk.Button(
+            header,
+            text="🗑️",
+            font=("Arial", 8),
+            bg="#e74c3c",
+            fg="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=5,
+            pady=2,
+            command=self._clear_all
+        )
+        clear_btn.pack(side=tk.RIGHT, padx=5)
         
-        scrollbar = tk.Scrollbar(list_frame, bg=COLOR_CARD_BG)
+        # Liste
+        list_frame = tk.Frame(self, bg="white", bd=1, relief=tk.SOLID)
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        scrollbar = ttk.Scrollbar(list_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.listbox = Listbox(
+        self.listbox = tk.Listbox(
             list_frame,
-            font=("Arial", 8),
+            font=("Arial", 9),
+            bg="white",
+            fg="#2c3e50",
+            selectmode=tk.EXTENDED,
             yscrollcommand=scrollbar.set,
-            selectmode=tk.SINGLE,
-            bg=COLOR_DARK_BG,
-            fg=COLOR_TEXT_LIGHT,
-            selectbackground=COLOR_SUNO_ORANGE,
-            selectforeground="white",
-            activestyle='none',
-            bd=0,
-            highlightthickness=0
+            activestyle='none'
         )
         self.listbox.pack(fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.listbox.yview)
         
-        # Bind
-        self.listbox.bind("<Button-3>", self._on_right_click)
+        # Bind double-click pour supprimer
+        self.listbox.bind("<Double-Button-1>", self._on_double_click)
         
-        # Boutons
-        btns = tk.Frame(self, bg=COLOR_CARD_BG)
-        btns.pack(fill=tk.X, pady=(3, 0))
+        # Boutons d'action
+        actions = tk.Frame(self, bg="#2c3e50", height=35)
+        actions.pack(fill=tk.X, padx=5, pady=(0, 5))
+        actions.pack_propagate(False)
         
         tk.Button(
-            btns,
-            text=self.lang.get("player.buttons.download"),
-            font=("Arial", 8, "bold"),
-            bg=COLOR_SUNO_ORANGE,
+            actions,
+            text="📥 Télécharger",
+            font=("Arial", 9, "bold"),
+            bg="#27ae60",
             fg="white",
             relief=tk.FLAT,
             cursor="hand2",
-            padx=8,
-            pady=4,
-            command=self.download_all
-        ).pack(side=tk.LEFT, padx=(0, 2))
-        
-        tk.Button(
-            btns,
-            text="🗑️",
-            font=("Arial", 8, "bold"),
-            bg=COLOR_DANGER,
-            fg="white",
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=8,
-            pady=4,
-            command=self.clear
-        ).pack(side=tk.RIGHT)
+            padx=10,
+            pady=5,
+            command=self._download_all
+        ).pack(fill=tk.BOTH, expand=True)
     
-    def add(self, clip_data: dict) -> bool:
-        """Ajoute un clip"""
-        clip_id = clip_data.get('clip', {}).get('id', '')
+    # -------------------------------------------------------------------------
+    # Gestion de la liste
+    # -------------------------------------------------------------------------
+    def add(self, clip_data: Dict) -> bool:
+        """
+        Ajoute un clip à la liste de téléchargement
         
-        # Évite doublons
-        if any(c.get('clip', {}).get('id') == clip_id for c in self.download_list):
+        Args:
+            clip_data: Données du clip (incluant éventuellement '_workspace_name')
+        
+        Returns:
+            True si ajouté, False si déjà présent
+        """
+        clip = clip_data.get('clip', {})
+        clip_id = clip.get('id', '')
+        title = clip.get('title', 'Sans titre')
+        
+        if not clip_id:
             return False
         
+        # Vérifie si déjà dans la liste (par ID de clip)
+        for item in self.download_list:
+            existing_id = item.get('clip', {}).get('id')
+            if existing_id == clip_id:
+                return False
+        
+        # Ajoute
         self.download_list.append(clip_data)
-        self.update_display()
+        
+        # Affiche dans la listbox
+        id_short = clip_id[:8]
+        workspace = clip_data.get('_workspace_name', '')
+        if workspace:
+            display_text = f"{title} [{id_short}] — {workspace}"
+        else:
+            display_text = f"{title} [{id_short}]"
+        
+        self.listbox.insert(tk.END, display_text)
+        
+        # Met à jour le compteur
+        self._update_count()
+        
         return True
+    
+    def remove(self, index: int):
+        """Supprime un clip de la liste"""
+        if 0 <= index < len(self.download_list):
+            self.download_list.pop(index)
+            self.listbox.delete(index)
+            self._update_count()
     
     def clear(self):
         """Vide la liste"""
+        self.download_list.clear()
+        self.listbox.delete(0, tk.END)
+        self._update_count()
+    
+    # -------------------------------------------------------------------------
+    # Helpers
+    # -------------------------------------------------------------------------
+    def _update_count(self):
+        """Met à jour le compteur"""
+        count = len(self.download_list)
+        # Si tu as des clés de langue, tu peux les utiliser ici
+        # ex: self.lang.get('download_list.title', count=count)
+        self.title_label.config(text=f"📥 À télécharger ({count})")
+    
+    def _clear_all(self):
+        """Vide toute la liste (avec confirmation)"""
         if not self.download_list:
             return
         
-        count = len(self.download_list)
-        self.download_list.clear()
-        self.update_display()
-        
-        if self.callbacks.get('on_clear'):
-            self.callbacks['on_clear'](count)
-    
-    def remove(self, index: int):
-        """Retire un élément"""
-        if 0 <= index < len(self.download_list):
-            self.download_list.pop(index)
-            self.update_display()
-    
-    def download_all(self):
-        """Télécharge tout"""
-        if self.callbacks.get('on_download_all'):
-            self.callbacks['on_download_all'](self.download_list)
-    
-    def update_display(self):
-        """Met à jour l'affichage"""
-        self.listbox.delete(0, tk.END)
-        
-        for i, clip_data in enumerate(self.download_list):
-            clip = clip_data.get('clip', {})
-            title = clip.get('title', self.lang.get('common.untitled'))  # ⭐ TRADUIT
-            clip_id = clip.get('id', '')[:8]
-            
-            display_title = f"{title[:35]} [{clip_id}]"
-            self.listbox.insert(tk.END, f"{i+1}. {display_title}")
-        
-        # ⭐ TRADUIT
-        self.count_label.config(
-            text=f"⬇️ {self.lang.get('player.downloads')} ({len(self.download_list)})"
+        result = messagebox.askyesno(
+            "Vider la liste",
+            f"Supprimer {len(self.download_list)} clip(s) de la liste ?"
         )
+        
+        if result:
+            self.clear()
+            
+            # Callback
+            on_clear: Callable = self.callbacks.get('on_clear')
+            if callable(on_clear):
+                on_clear()
     
-    def _on_right_click(self, event):
-        """Clic droit → Menu"""
-        selection = self.listbox.curselection()
-        if not selection:
+    def _download_all(self):
+        """Lance le téléchargement de tous les clips"""
+        if not self.download_list:
+            messagebox.showinfo("Info", "Aucun clip dans la liste de téléchargement")
             return
         
-        index = selection[0]
-        clip_data = self.download_list[index]
-        
-        menu = Menu(self, tearoff=0)
-        menu.add_command(label=f"📥 {self.lang.get('player.context_menu.download')}", command=lambda: self.callbacks.get('on_download_one')(clip_data, index))
-        menu.add_command(label=f"🖼️ {self.lang.get('player.context_menu.view_details')}", command=lambda: self.callbacks.get('on_details')(clip_data))
-        menu.add_separator()
-        menu.add_command(label=f"🗑️ {self.lang.get('player.context_menu.remove')}", command=lambda: self.remove(index))
-        
-        try:
-            menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            menu.grab_release()
+        on_download_all: Callable = self.callbacks.get('on_download_all')
+        if callable(on_download_all):
+            on_download_all(self.download_list)
+    
+    def _on_double_click(self, event):
+        """Supprime le clip double-cliqué"""
+        selection = self.listbox.curselection()
+        if selection:
+            index = selection[0]
+            self.remove(index)
+    
+    # -------------------------------------------------------------------------
+    # Internationalisation
+    # -------------------------------------------------------------------------
+    def update_texts(self):
+        """Met à jour les textes (pour changement de langue)"""
+        # Ici tu peux brancher ton lang_manager si tu as des clés
+        # Exemple :
+        # title = self.lang.get('download_list.title', count=len(self.download_list))
+        # self.title_label.config(text=title)
+        self._update_count()
